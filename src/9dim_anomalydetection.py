@@ -75,7 +75,7 @@ def gen_wave():
 #    wave1[insert:insert + 50] = wave1[insert:insert + 50] + wave3
 #    return wave1 + wave2
 
-    data = json.load(open('C:\\Users\\muellersm\\Desktop\\71124z36_matrix.json'))
+    data = json.load(open('..\\data\\71124z36_matrix.json'))
     myarray = []
     for i in range (0, 1400):
         myarray.append((([data["trial"]["frames"][i]["Mir_m00"]],[data["trial"]["frames"][i]["Mir_m01"]],[data["trial"]["frames"][i]["Mir_m02"]],[data["trial"]["frames"][i]["Mir_m10"]],[data["trial"]["frames"][i]["Mir_m11"]],[data["trial"]["frames"][i]["Mir_m12"]],[data["trial"]["frames"][i]["Mir_m20"]],[data["trial"]["frames"][i]["Mir_m21"]],[data["trial"]["frames"][i]["Mir_m22"]])))

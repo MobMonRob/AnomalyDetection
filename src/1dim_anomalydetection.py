@@ -74,7 +74,7 @@ def gen_wave():
 #    wave1[insert:insert + 50] = wave1[insert:insert + 50] + wave3
 #    return wave1 + wave2
 
-    data = json.load(open('C:\\Users\\muellersm\\Desktop\\71124z36.json'))
+    data = json.load(open('..\\data\\71124z36.json'))
     myarray = []
     for i in range (0, 1400):
         myarray.append((data["trial"]["frames"][i]["Height"]))
