@@ -1,6 +1,7 @@
 # Setup
 ### Using Anaconda
-Import the `environment.yml` file as a new environment in Anaconda
+Import the `environment.yml` file as a new environment in Anaconda.
+
 To use this environment with the Netbeans IDE, add a new Python platform by navigating to the folder of the environment and select the python.exe file. All needed paths are than set auto-magically. Be careful: The project setting can point to an other python environment. Maybe you have to change the project settings to use new configured python environment.
 
 ### Using PIP
