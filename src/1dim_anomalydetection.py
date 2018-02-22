@@ -164,7 +164,7 @@ def build_model():
             input_dim=layers['input'],
             output_dim=layers['hidden1'],
             return_sequences=True)) 
-    model.add(GaussianNoise(stddev))
+    #model.add(GaussianNoise(stddev))
     model.add(Dropout(0.2))
    
 
