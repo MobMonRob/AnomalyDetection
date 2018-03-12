@@ -32,7 +32,7 @@ np.random.seed(1234)
 # Global hyper-parameters
 sequence_length = 100
 random_data_dup = 10  # each sample randomly duplicated between 0 and 9 times, see dropin function
-epochs = 1
+epochs = 3
 batch_size = 50
 
 
@@ -81,13 +81,15 @@ def gen_wave():
         myarray.append((([data["trial"]["frames"][i]["Mir_m00"]],[data["trial"]["frames"][i]["Mir_m01"]],[data["trial"]["frames"][i]["Mir_m02"]],[data["trial"]["frames"][i]["Mir_m10"]],[data["trial"]["frames"][i]["Mir_m11"]],[data["trial"]["frames"][i]["Mir_m12"]],[data["trial"]["frames"][i]["Mir_m20"]],[data["trial"]["frames"][i]["Mir_m21"]],[data["trial"]["frames"][i]["Mir_m22"]])))
     """
     myarray = []
-    with open('..\\data\\Messung_1.csv') as f:
+    with open('..\\data\\Messung_2.csv') as f:
         lines = f.readlines()
-        
+        print("Lines in CSV: ", len(lines))
+        i = 0
         for line in lines:
+            i = i+1
             split =  line.split(',')
             if (len(split) > 9):
-                myarray.append([split[2], split[3], split[4], split[6], split[7], split[8]])
+                myarray.append([float(split[2]), float(split[3]), float(split[4]), float(split[6]), float(split[7]), float(split[8])])
     
     
     
@@ -116,7 +118,7 @@ def get_split_prep_data(train_start, train_end,
                           test_start, test_end):
     data = gen_wave()
     print (data.shape)
-    data = np.reshape(data,(1400,6))
+    data = np.reshape(data,(2272,6))
     print("Length of Data", len(data))
 
     # train data
@@ -176,8 +178,8 @@ def get_split_prep_data(train_start, train_end,
     print("Shape X_train", np.shape(X_train))
     print("Shape X_test", np.shape(X_test))
 
-    X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 9))
-    X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 9))
+    X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 6))
+    X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 6))
 
     return X_train, y_train, X_test, y_test
 
@@ -186,7 +188,7 @@ def build_model():
     
     
     model = Sequential()
-    layers = {'input': 9,  'test1': 1, 'hidden1': 64, 'hidden2': 9, 'hidden3': 64, 'test2': 1, 'output': 9}
+    layers = {'input': 6,  'test1': 1, 'hidden1': 64, 'hidden2': 9, 'hidden3': 64, 'test2': 1, 'output': 6}
 
     model.add(LSTM(
             input_length=sequence_length - 1,
@@ -243,7 +245,7 @@ def run_network(model=None, data=None):
     if data is None:
         print ('Loading data... ')
         # train on first 700 samples and test on next 300 samples (has anomaly)
-        X_train, y_train, X_test, y_test = get_split_prep_data(0, 700, 500, 1000)
+        X_train, y_train, X_test, y_test = get_split_prep_data(0, 1000, 0, 2000)
     else:
         X_train, y_train, X_test, y_test = data
 
@@ -272,7 +274,7 @@ def run_network(model=None, data=None):
             #.append(math.atan2(-predicted [i][1], predicted [i] [0]))   #yaw-angle
             #z.append(math.atan2(-predicted [i][5], predicted [i] [8]))
             #z.append(math.atan2(predicted [i][2], math.sqrt(predicted [i] [8]*predicted [i] [8]+ predicted [i] [5]*predicted [i] [5])))
-            z.append(abs(predicted [i][0])+abs(predicted [i][1])+abs(predicted [i][2])+abs(predicted [i][3])+abs(predicted [i][4])+abs(predicted [i][5])+abs(predicted [i][6])+abs(predicted [i][7])+abs(predicted [i][8]))
+            z.append(abs(predicted [i][0])+abs(predicted [i][1])+abs(predicted [i][2])+abs(predicted [i][3])+abs(predicted [i][4])+abs(predicted [i][5]))
             
         z = np.array(z)
             
@@ -281,7 +283,7 @@ def run_network(model=None, data=None):
             #signal.append(math.atan2(-y_test [i][1], y_test [i] [0]))
             #signal.append(math.atan2(-y_test [i][5], y_test [i] [8]))
             #signal.append(math.atan2(y_test [i][2], math.sqrt(y_test [i] [8]*y_test [i] [8]+ y_test [i] [5]*y_test [i] [5])))
-            signal. append(abs(y_test [i][0])+abs(y_test [i][1])+abs(y_test [i][2])+abs(y_test [i][3])+abs(y_test [i][4])+abs(y_test [i][5])+abs(y_test [i][6])+abs(y_test [i][7])+abs(y_test [i][8]))
+            signal. append(abs(y_test [i][0])+abs(y_test [i][1])+abs(y_test [i][2])+abs(y_test [i][3])+abs(y_test [i][4])+abs(y_test [i][5]))
             
        
 #        for i in range (0, 400):
