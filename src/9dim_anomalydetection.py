@@ -75,14 +75,25 @@ def gen_wave():
 #    wave1[insert:insert + 50] = wave1[insert:insert + 50] + wave3
 #    return wave1 + wave2
 
-    data = json.load(open('..\\data\\71124z36_matrix.json'))
+    """data = json.load(open('..\\data\\71124z36_matrix.json'))
     myarray = []
     for i in range (0, 1400):
         myarray.append((([data["trial"]["frames"][i]["Mir_m00"]],[data["trial"]["frames"][i]["Mir_m01"]],[data["trial"]["frames"][i]["Mir_m02"]],[data["trial"]["frames"][i]["Mir_m10"]],[data["trial"]["frames"][i]["Mir_m11"]],[data["trial"]["frames"][i]["Mir_m12"]],[data["trial"]["frames"][i]["Mir_m20"]],[data["trial"]["frames"][i]["Mir_m21"]],[data["trial"]["frames"][i]["Mir_m22"]])))
+    """
+    myarray = []
+    with open('..\\data\\Messung_1.csv') as f:
+        lines = f.readlines()
+        
+        for line in lines:
+            split =  line.split(',')
+            if (len(split) > 9):
+                myarray.append([split[2], split[3], split[4], split[6], split[7], split[8]])
+    
+    
     
     myarray = np.array(myarray)
     
-    print ("myarray: ", myarray)
+    print ("IMPORTANT_myarray: ", myarray)
 #   myarray = np.flipud(myarray)
     
 #    b, a = signal.butter(3, 0.05)
@@ -105,7 +116,7 @@ def get_split_prep_data(train_start, train_end,
                           test_start, test_end):
     data = gen_wave()
     print (data.shape)
-    data = np.reshape(data,(1400,9))
+    data = np.reshape(data,(1400,6))
     print("Length of Data", len(data))
 
     # train data
@@ -175,7 +186,7 @@ def build_model():
     
     
     model = Sequential()
-    layers = {'input': 9,  'test1': 1, 'hidden1': 64, 'hidden2': 256, 'hidden3': 100, 'test2': 1, 'output': 9}
+    layers = {'input': 9,  'test1': 1, 'hidden1': 64, 'hidden2': 9, 'hidden3': 64, 'test2': 1, 'output': 9}
 
     model.add(LSTM(
             input_length=sequence_length - 1,
@@ -280,10 +291,6 @@ def run_network(model=None, data=None):
 #        
         mse =[]
         signal = np.array(signal)
-        print (signal)
-        print ("signal-shape", signal.shape)
-        print (z)
-        print ("z-shape", z.shape)
         print("Reshaping predicted")
         predicted = np.reshape(predicted, (predicted.size,))
     except KeyboardInterrupt:
@@ -292,19 +299,18 @@ def run_network(model=None, data=None):
         return model, y_test, 0
 
     try:
-        print ("test1")
+
         plt.figure(1)
         plt.subplot(311)
         plt.title("Actual Test Signal w/Anomalies")
         plt.plot(signal, 'b')
         #plt.plot(test1, 'b')
         
-        print ("test2")
         plt.subplot(312)
         plt.title("Predicted Signal")
         plt.plot(z, 'g')
         #plt.plot(test2, 'b')
-        print ("test3")
+
         plt.subplot(313)
         plt.title("Squared Error")
         mse = ((signal - z) ** 2)
@@ -325,9 +331,16 @@ def run_network(model=None, data=None):
 #                        
 #                            
 #        print ("Anomalies detected:", anomaly_counter)
-        
+        mse = mse - mse.mean()
         plt.plot(mse, 'r')
+        warnings = []
+        for i in range(0,len(mse)):
+            if abs(mse[i]) > 0.1:
+                line = warnings.append(i)
+                line.set_alpha(0.5)
         
+        for xc in warnings:
+            plt.axvline(x=xc)
         
 #        x = np.arange(len(mse)+1)
 #        heights = [1] * len(mse)
@@ -347,7 +360,6 @@ def run_network(model=None, data=None):
 #        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 #        sm.set_array([])
 #        fig.colorbar(sm)
-        print ("test4")
         plt.show()
     except Exception as e:
         print("plotting exception")

@@ -95,7 +95,9 @@ def z_norm(result):
     result_mean = result.mean()
     result_std = result.std()
     stddev = result.std()
+    # Daten verschieben das mean auf 0 liegt
     result -= result_mean
+    # Daten skalieren durhc teilen durch std
     result /= result_std
     return result, result_mean
 
@@ -148,7 +150,7 @@ def get_split_prep_data(train_start, train_end,
     print("Shape X_train", np.shape(X_train))
     print("Shape X_test", np.shape(X_test))
     
-    
+    # respahe ändert die form vom ersten parameter (array) zu einem array der größedes zweiten parameters (array)
     X_train = np.reshape(X_train, (X_train.shape[0], X_train.shape[1], 1))
     X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 1))
 
@@ -285,7 +287,6 @@ def run_network(model=None, data=None):
 #        sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 #        sm.set_array([])
 #        fig.colorbar(sm)
-        
         plt.show()
     except Exception as e:
         print("plotting exception")
