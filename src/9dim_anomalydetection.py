@@ -32,7 +32,7 @@ np.random.seed(1234)
 # Global hyper-parameters
 sequence_length = 100
 random_data_dup = 10  # each sample randomly duplicated between 0 and 9 times, see dropin function
-epochs = 3
+epochs = 1
 batch_size = 50
 
 
