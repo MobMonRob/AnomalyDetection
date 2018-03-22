@@ -26,6 +26,9 @@ from keras.utils import plot_model
 import matplotlib.colors
 import pandas as pd
 import sys
+import queue
+import socket
+
 
 
 np.random.seed(1234)
@@ -36,9 +39,7 @@ random_data_dup = 10  # each sample randomly duplicated between 0 and 9 times, s
 epochs = 1
 batch_size = 50
 
-
 class Predictor:
-    model
     X_test = []
     y_test = []
     min = 0
@@ -50,8 +51,13 @@ class Predictor:
         self.max = max
     
     def predictForFrame(self, data):
-        X_test = data[:, :-1]
-        self.y_test = data[:, -1]
+        result = []
+        for index in range(0, len(data) - sequence_length):
+            result.append(data[index: index + sequence_length])
+        result = np.array(result) 
+        
+        X_test = result[:, :-1]
+        self.y_test = result[:, -1]
         self.X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 6))
         predicted = model.predict(X_test)
         predicted = np.reshape(predicted, (predicted.size,))
@@ -78,9 +84,12 @@ class Predictor:
                 max = mse[i]
             if (mse[i] < min):
                 min = mse[i]
-            
-        print("threshold", min, max)
-
+        
+        # alarm if out of threshold
+        if (max > self.max or min < self.min):
+            print("ANOMALY", min, "von", self.min, max, "von", self.max)
+        else:
+            print("NORMAL", min, "von", self.min, max, "von", self.max)
         
 
 class Trainer:
@@ -90,9 +99,11 @@ class Trainer:
     min = 0
     max = 0
     
-    def trainOnPrerecorded(self, filePath, model, trainStart, trainEnd):
+    def prepareOnPrerecorded(self, filePath, trainStart, trainEnd):
         self.loadDataFromFile(filePath)
         self.prepareData(trainStart, trainEnd)
+    
+    def trainGroundLevel(self, model):
         self.train(model)
         self.predictToGenerateThreshold(model)
         return model, self.min, self.max
@@ -129,10 +140,9 @@ class Trainer:
         np.random.shuffle(train)  # shuffles in-place
         X_train = train[:, :-1]
         y_train = train[:, -1]
-        self.X_train, self.y_train = dropin(X_train, y_train)
+        self.X_train, self.y_train = self.dropin(X_train, y_train)
         
     def z_norm(self, result):
-    
         global stddev
         result_mean = result.mean()
         result_std = result.std()
@@ -204,7 +214,107 @@ class Trainer:
         print("threshold", min, max)
 
 
-def build_model():          
+class UDP_Detector:
+    
+    # size of frame
+    frame_size = 0
+    
+    # displacement size
+    disp_size = 0
+    
+    # port used for UDP connection
+    port = 0
+    
+    run = True
+    
+    # array used for the prediction
+    predict_array = []
+    
+    def __init__(self, port, frame_size, disp_size, predictor):
+        self.frame_size = frame_size
+        self.port = port
+        self.disp_size = disp_size
+        self.predictor = predictor
+       
+    def predict(self):
+        self.predictor.predictForFrame(self.predict_array)
+    
+    def start(self):
+        
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        
+        #open socket
+        sock.bind(('', self.port))
+        
+        print("Socket opened")
+        
+        first_fill = True
+        
+        self.predict_array = []
+        
+        # init Q according to frame size
+        frameQ = queue.Queue(maxsize=self.frame_size)
+        
+        self.run = True
+        
+        i = 0
+        
+        while self.run:
+            measurement = []
+            data, addr = sock.recvfrom(1024)
+            
+            # decode bytestream to string
+            data = data.decode("utf-8")
+    
+            # split CSV
+            split =  data.split(",")
+            
+            # fill measurement array
+            if (len(split) > 9):
+                measurement.append([float(split[2]), float(split[3]), float(split[4]), float(split[6]), float(split[7]), float(split[8])])    
+            
+            # fill Q initially
+            if (first_fill):
+                
+                # fill Q
+                frameQ.put_nowait(measurement)
+                
+                if (frameQ.full()):
+                    
+                    print("Q initially filled")
+                    
+                    # dump Q to numpy array
+                    self.predict_array = np.array(frameQ.queue)
+                    
+                    self.predict()
+                    print("started prediction with initial Q")
+                    
+                    # next measurement will pop the first element of the Q
+                    first_fill = False
+            else:
+                i = i + 1
+                
+                # pop first element of the Q
+                frameQ.get()
+                
+                frameQ.put_nowait(measurement)
+        
+            if (i == self.disp_size): # Q updated according to disp_size
+                
+                print("Q updated according to disp_size")
+                
+                #dump Q to numpy
+                self.predict_array = np.array(frameQ.queue)
+                
+                # call predictor
+                self.predict()
+                print ("started prediction with ", self.disp_size, " new elements in frame")
+                
+                i = 0
+        def stop():
+            self.run = False
+
+def build_model():    
     model = Sequential()
     layers = {'input': 6,  'test1': 1, 'hidden1': 64, 'hidden2': 9, 'hidden3': 64, 'test2': 1, 'output': 6}
     
@@ -239,10 +349,6 @@ def build_model():
 
     return model
 
-
-
-
-
 def normalize(v):
     norm = v.max()
     if norm == 0: 
@@ -250,8 +356,12 @@ def normalize(v):
     return v / norm
 
 
-model = build_model()
 
 trainer = Trainer()
-model, min, max = trainer.trainOnPrerecorded('..\\data\\hit.csv', model, 200, 1000)
+trainer.prepareOnPrerecorded('..\\data\\hit.csv', 200, 1000)
+model = build_model()
+model, min, max = trainer.trainGroundLevel(model)
 predictor = Predictor(model, min, max)
+
+detector = UDP_Detector(8888, 100, 10, predictor)
+detector.start()
