@@ -1,5 +1,5 @@
 import numpy as np
-import Queue
+import queue
 import socket
 
 class UDP_Detector:
@@ -14,9 +14,6 @@ class UDP_Detector:
     port = 0
     
     run = True
-    
-    # predictor instance
-    predictor = False
     
     # array used for the prediction
     predict_array = []
@@ -37,14 +34,14 @@ class UDP_Detector:
         #open socket
         sock.bind(('', self.port))
         
-        print "Socket opened"
+        print ("Socket opened")
         
         first_fill = True
         
         self.predict_array = []
         
         # init Q according to frame size
-        frameQ = Queue.Queue(maxsize=self.frame_size)
+        frameQ = queue.Queue(maxsize=self.frame_size)
         
         self.run = True
         
@@ -69,13 +66,14 @@ class UDP_Detector:
                 
                 if (frameQ.full()):
                     
-                    print "Q initially filled"
+                    print ("Q initially filled")
                     
                     # dump Q to numpy array
                     self.predict_array = np.array(frameQ.queue)
                     
-                    ## self.predict()
-                    print "started prediction with initial Q"
+                    # call the predictor
+                    ##self.predict()
+                    print ("started prediction with initial Q")
                     
                     # next measurement will pop the first element of the Q
                     first_fill = False
@@ -89,16 +87,17 @@ class UDP_Detector:
         
             if (i == self.disp_size): # Q updated according to disp_size
                 
-                print "Q updated according to disp_size"
+                print ("Q updated according to disp_size = " + str(self.disp_size))
                 
                 #dump Q to numpy
                 self.predict_array = np.array(frameQ.queue)
                 
-                # call predictor
-                ## self.predict()
-                print "started prediction with ", self.disp_size, " new elements in frame"
+                # call the predictor
+                ##self.predict()
+                print ("started prediction with " + str(self.disp_size) + " new elements in frame")
                 
                 i = 0
+                
         def stop():
             self.run = False
             
