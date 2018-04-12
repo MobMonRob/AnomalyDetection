@@ -49,29 +49,39 @@ class Predictor:
         self.model = model
         self.min = min
         self.max = max
+        
+    def z_norm(self, result):
+        global stddev
+        #result_mean = result.mean()
+        #result_std = result.std()
+        #stddev = result.std()
+        result -= stmean
+        result /= stddev
+        return result
     
     def predictForFrame(self, data):
         result = []
         for index in range(0, len(data) - sequence_length):
             result.append(data[index: index + sequence_length])
         result = np.array(result) 
-        
+        result = self.z_norm(result)
+
         X_test = result[:, :-1]
-        self.y_test = result[:, -1]
+        y_test = result[:, -1]
         self.X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 6))
-        predicted = model.predict(X_test)
-        predicted = np.reshape(predicted, (predicted.size,))
+        predicted = model.predict(self.X_test)
+        #predicted = np.reshape(predicted, (predicted.size,))
         
         z= []
         start = 0        
-        for i in range (start, len(predicted)+start):
+        for i in range (0, len(predicted)):
           z.append(abs(predicted [i][0])+abs(predicted [i][1])+abs(predicted [i][2])+abs(predicted [i][3])+abs(predicted [i][4])+abs(predicted [i][5]))
             
         z = np.array(z)
             
         signal =[]
-        for i in range (start, len(predicted)+start):
-            signal. append(abs(y_test [i][0])+abs(y_test [i][1])+abs(y_test [i][2])+abs(y_test [i][3])+abs(y_test [i][4])+abs(y_test [i][5]))
+        for i in range (0, len(predicted)):
+            signal.append(abs(y_test [i][0])+abs(y_test [i][1])+abs(y_test [i][2])+abs(y_test [i][3])+abs(y_test [i][4])+abs(y_test [i][5]))
 
  
         mse = ((signal - z) ** 2)        
@@ -87,21 +97,24 @@ class Predictor:
         
         # alarm if out of threshold
         if (max > self.max or min < self.min):
-            print("ANOMALY", min, "von", self.min, max, "von", self.max)
+            print("ANOMALY min: ", min, "von", self.min,"... max: ", max, "von", self.max)
         else:
-            print("NORMAL", min, "von", self.min, max, "von", self.max)
+            print("NORMAL min: ", min, "von", self.min, "... max: ", max, "von", self.max)
         
 
 class Trainer:
     trainData = []
     X_train = []
     y_train = []
+    testDate = []
+    X_test = []
+    y_test = []
     min = 0
     max = 0
     
-    def prepareOnPrerecorded(self, filePath, trainStart, trainEnd):
+    def prepareOnPrerecorded(self, filePath, trainStart, trainEnd, testStart, testEnd):
         self.loadDataFromFile(filePath)
-        self.prepareData(trainStart, trainEnd)
+        self.prepareData(trainStart, trainEnd, testStart, testEnd)
     
     def trainGroundLevel(self, model):
         self.train(model)
@@ -126,14 +139,13 @@ class Trainer:
         self.trainData = trainData
         return trainData
     
-    def prepareData(self, trainStart, trainEnd):
+    def prepareData(self, trainStart, trainEnd, testStart, testEnd):
         result = []
         for index in range(trainStart, trainEnd - sequence_length):
             result.append(self.trainData[index: index + sequence_length])
         result = np.array(result) 
         result, result_mean = self.z_norm(result)
     
-        print ("Mean of train data : ", result_mean)
         print ("Train data shape  : ", result.shape)
     
         train = result[trainStart:trainEnd, :]
@@ -142,11 +154,28 @@ class Trainer:
         y_train = train[:, -1]
         self.X_train, self.y_train = self.dropin(X_train, y_train)
         
+        
+        ##Test data to generate threshold
+        result = []
+        for index in range(testStart, testEnd - sequence_length):
+            result.append(self.trainData[index: index + sequence_length])
+        result = np.array(result) 
+        result, result_mean = self.z_norm(result)
+    
+        print ("Test data shape  : ", result.shape)
+    
+        test = result[0:testEnd-testStart, :]
+        self.X_test = test[:, :-1]
+        self.y_test = test[:, -1]
+        
+        
     def z_norm(self, result):
         global stddev
+        global stmean
         result_mean = result.mean()
         result_std = result.std()
         stddev = result.std()
+        stmean = result_mean
         result -= result_mean
         result /= result_std
         return result, result_mean
@@ -183,7 +212,7 @@ class Trainer:
 
 
     def predictToGenerateThreshold(self, model):
-        predicted = model.predict(self.X_train)
+        predicted = model.predict(self.X_test)
         
         z= []
         start = 0
@@ -195,7 +224,7 @@ class Trainer:
             
         signal =[]
         for i in range (start, len(predicted)+start):
-            signal. append(abs(self.y_train [i][0])+abs(self.y_train [i][1])+abs(self.y_train [i][2])+abs(self.y_train [i][3])+abs(self.y_train [i][4])+abs(self.y_train [i][5]))
+            signal. append(abs(self.y_test [i][0])+abs(self.y_test [i][1])+abs(self.y_test [i][2])+abs(self.y_test [i][3])+abs(self.y_test [i][4])+abs(self.y_test [i][5]))
             
         signal = np.array(signal)
         
@@ -227,6 +256,8 @@ class UDP_Detector:
     
     run = True
     
+    sock = None
+    
     # array used for the prediction
     predict_array = []
     
@@ -241,10 +272,10 @@ class UDP_Detector:
     
     def start(self):
         
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         
         #open socket
-        sock.bind(('', self.port))
+        self.sock.bind(('', self.port))
         
         print("Socket opened")
         
@@ -261,56 +292,51 @@ class UDP_Detector:
         
         while self.run:
             measurement = []
-            data, addr = sock.recvfrom(1024)
+            data, addr = self.sock.recvfrom(1024)
             
             # decode bytestream to string
             data = data.decode("utf-8")
-    
+
             # split CSV
             split =  data.split(",")
             
             # fill measurement array
             if (len(split) > 9):
-                measurement.append([float(split[2]), float(split[3]), float(split[4]), float(split[6]), float(split[7]), float(split[8])])    
+                measurement = [float(split[2]), float(split[3]), float(split[4]), float(split[6]), float(split[7]), float(split[8])]    
             
-            # fill Q initially
-            if (first_fill):
-                
-                # fill Q
-                frameQ.put_nowait(measurement)
-                
-                if (frameQ.full()):
+                # fill Q initially
+                if (first_fill):
                     
-                    print("Q initially filled")
+                    # fill Q
+                    frameQ.put_nowait(measurement)
                     
-                    # dump Q to numpy array
+                    if (frameQ.full()):
+                        
+                        # dump Q to numpy array
+                        self.predict_array = np.array(frameQ.queue)
+                        
+                        self.predict()
+                        
+                        # next measurement will pop the first element of the Q
+                        first_fill = False
+                else:
+                    i = i + 1
+                    
+                    # pop first element of the Q
+                    frameQ.get()
+                    
+                    frameQ.put_nowait(measurement)
+            
+                if (i == self.disp_size): # Q updated according to disp_size
+                                        
+                    #dump Q to numpy
                     self.predict_array = np.array(frameQ.queue)
                     
+                    # call predictor
                     self.predict()
-                    print("started prediction with initial Q")
+                    #print ("started prediction with ", self.disp_size, " new elements in frame")
                     
-                    # next measurement will pop the first element of the Q
-                    first_fill = False
-            else:
-                i = i + 1
-                
-                # pop first element of the Q
-                frameQ.get()
-                
-                frameQ.put_nowait(measurement)
-        
-            if (i == self.disp_size): # Q updated according to disp_size
-                
-                print("Q updated according to disp_size")
-                
-                #dump Q to numpy
-                self.predict_array = np.array(frameQ.queue)
-                
-                # call predictor
-                self.predict()
-                print ("started prediction with ", self.disp_size, " new elements in frame")
-                
-                i = 0
+                    i = 0
         def stop():
             self.run = False
 
@@ -358,10 +384,10 @@ def normalize(v):
 
 
 trainer = Trainer()
-trainer.prepareOnPrerecorded('..\\data\\hit.csv', 200, 1000)
+trainer.prepareOnPrerecorded('..\\data\\messung_2.csv', 0, 900, 900, 1000)
 model = build_model()
 model, min, max = trainer.trainGroundLevel(model)
 predictor = Predictor(model, min, max)
 
-detector = UDP_Detector(8888, 100, 10, predictor)
+detector = UDP_Detector(8888, 500, 50, predictor)
 detector.start()
