@@ -28,6 +28,7 @@ import pandas as pd
 import sys
 import queue
 import socket
+import h5py
 
 
 
@@ -399,7 +400,7 @@ model = build_model()
 model, min, max = trainer.trainGroundLevel(model)
 model.save('trained-train_parcour.h5', overwrite=True)
 with open("thresholds.txt", 'w') as file:
-    file.write(min, "#", max)
+    file.write(str(min) + "#" + str(max))
 
 #predictor = Predictor(model, min, max)
 
