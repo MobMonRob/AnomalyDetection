@@ -44,6 +44,8 @@ class Predictor:
     y_test = []
     min = 0
     max = 0
+    anomaly = False
+    anomalyCounter = 0
     
     def __init__(self, model, min, max):
         self.model = model
@@ -97,9 +99,12 @@ class Predictor:
         
         # alarm if out of threshold
         if (max > self.max or min < self.min):
-            print("ANOMALY min: ", min, "von", self.min,"... max: ", max, "von", self.max)
+            if not self.anomaly:
+                self.anomaly = True
+                self.anomalyCounter = self.anomalyCounter + 1
         else:
-            print("NORMAL min: ", min, "von", self.min, "... max: ", max, "von", self.max)
+            if self.anomaly:
+                self.anomaly = False
         
 
 class Trainer:
@@ -112,8 +117,13 @@ class Trainer:
     min = 0
     max = 0
     
-    def prepareOnPrerecorded(self, filePath, trainStart, trainEnd, testStart, testEnd):
+    def prepareOnPrerecorded(self, filePath):
         self.loadDataFromFile(filePath)
+        trainStart = 0
+        trainEnd = int(len(self.trainData)*0.9)
+        testStart = trainEnd + 1
+        testEnd = len(self.trainData)
+        print("Train: " + str(trainStart) + "-" + str(trainEnd) + "   Test: " + str(testStart) + "-" + str(testEnd))
         self.prepareData(trainStart, trainEnd, testStart, testEnd)
     
     def trainGroundLevel(self, model):
@@ -136,8 +146,8 @@ class Trainer:
         
         trainData = np.array(trainData)
         trainData = np.reshape(trainData,(trainData.shape[0],6))
+        print(len(trainData))
         self.trainData = trainData
-        return trainData
     
     def prepareData(self, trainStart, trainEnd, testStart, testEnd):
         result = []
@@ -384,10 +394,14 @@ def normalize(v):
 
 
 trainer = Trainer()
-trainer.prepareOnPrerecorded('..\\data\\messung_2.csv', 0, 900, 900, 1000)
+trainer.prepareOnPrerecorded('..\\data\\train_parcour.csv')
 model = build_model()
 model, min, max = trainer.trainGroundLevel(model)
-predictor = Predictor(model, min, max)
+model.save('trained-train_parcour.h5', overwrite=True)
+with open("thresholds.txt", 'w') as file:
+    file.write(min, "#", max)
 
-detector = UDP_Detector(8888, 500, 50, predictor)
-detector.start()
+#predictor = Predictor(model, min, max)
+
+#detector = UDP_Detector(8888, 500, 50, predictor)
+#detector.start()

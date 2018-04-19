@@ -7,7 +7,7 @@ Created on Thu Mar  8 12:38:45 2018
 import matplotlib.pyplot as plt
 
 myarray = []
-with open('..\\data\\Messung_2.csv') as f:
+with open('..\\data\\long-training.csv') as f:
     lines = f.readlines()   
     for line in lines:
         split =  line.split(',')

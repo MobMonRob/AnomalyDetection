@@ -81,7 +81,7 @@ def gen_wave():
         myarray.append((([data["trial"]["frames"][i]["Mir_m00"]],[data["trial"]["frames"][i]["Mir_m01"]],[data["trial"]["frames"][i]["Mir_m02"]],[data["trial"]["frames"][i]["Mir_m10"]],[data["trial"]["frames"][i]["Mir_m11"]],[data["trial"]["frames"][i]["Mir_m12"]],[data["trial"]["frames"][i]["Mir_m20"]],[data["trial"]["frames"][i]["Mir_m21"]],[data["trial"]["frames"][i]["Mir_m22"]])))
     """
     myarray = []
-    with open('..\\data\\Messung_2.csv') as f:
+    with open('..\\data\\long-training.csv') as f:
         lines = f.readlines()
         print("Lines in CSV: ", len(lines))
         i = 0
@@ -118,7 +118,7 @@ def get_split_prep_data(train_start, train_end,
                           test_start, test_end):
     data = gen_wave()
     print (data.shape)
-    data = np.reshape(data,(2272,6))
+    data = np.reshape(data,(21145,6))
     print("Length of Data", len(data))
 
     # train data
@@ -245,7 +245,7 @@ def run_network(model=None, data=None):
     if data is None:
         print ('Loading data... ')
         # train on first 700 samples and test on next 300 samples (has anomaly)
-        X_train, y_train, X_test, y_test = get_split_prep_data(0, 1000, 0, 2000)
+        X_train, y_train, X_test, y_test = get_split_prep_data(0, 16000, 16001, 21145)
     else:
         X_train, y_train, X_test, y_test = data
 
