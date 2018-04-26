@@ -29,6 +29,7 @@ import sys
 import queue
 import socket
 import h5py
+from keras.models import load_model
 
 
 
@@ -39,12 +40,11 @@ sequence_length = 100
 random_data_dup = 10  # each sample randomly duplicated between 0 and 9 times, see dropin function
 epochs = 1
 batch_size = 50
+FFT = False
 
 class Predictor:
     X_test = []
     y_test = []
-    min = 0
-    max = 0
     anomaly = False
     anomalyCounter = 0
     
@@ -54,12 +54,13 @@ class Predictor:
         self.max = max
         
     def z_norm(self, result):
-        global stddev
-        #result_mean = result.mean()
-        #result_std = result.std()
-        #stddev = result.std()
-        result -= stmean
-        result /= stddev
+        global stddev ## evtl fixen
+        result_mean = result.mean()
+        result_std = result.std()
+        stddev = result.std()
+        stmean = result_mean
+        result -= result_mean
+        result /= result_std
         return result
     
     def predictForFrame(self, data):
@@ -72,8 +73,22 @@ class Predictor:
         X_test = result[:, :-1]
         y_test = result[:, -1]
         self.X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 6))
+        
+        if (FFT):
+            print("start FFT")
+            X_test = self.X_test
+            for i in range(0, len(X_test)):
+                outer = X_test[i, :, :]
+                for j in range(0, outer.shape[1]):
+                    fft = (np.fft.fft(outer[:, [j]]))
+                    outer[:,[j]] = fft
+                X_test[i] = outer
+            self.X_test = X_test
+            print("finished FFT ", X_test.shape )
+        
         predicted = model.predict(self.X_test)
         #predicted = np.reshape(predicted, (predicted.size,))
+        
         
         z= []
         start = 0        
@@ -106,7 +121,7 @@ class Predictor:
         else:
             if self.anomaly:
                 self.anomaly = False
-        
+        print(self.anomalyCounter, 'Error = ', max)
 
 class Trainer:
     trainData = []
@@ -165,6 +180,17 @@ class Trainer:
         y_train = train[:, -1]
         self.X_train, self.y_train = self.dropin(X_train, y_train)
         
+        if (FFT):
+            print("start FFT")
+            X_train = self.X_train
+            for i in range(0, len(X_train)):
+                outer = X_train[i, :, :]
+                for j in range(0, outer.shape[1]):
+                    fft = (np.fft.fft(outer[:, [j]]))
+                    outer[:,[j]] = fft
+                X_train[i] = outer
+            self.X_train = X_train
+            print("finished FFT ", X_train.shape )
         
         ##Test data to generate threshold
         result = []
@@ -178,6 +204,18 @@ class Trainer:
         test = result[0:testEnd-testStart, :]
         self.X_test = test[:, :-1]
         self.y_test = test[:, -1]
+        
+        if (FFT):
+            print("start FFT test data")
+            X_test = self.X_test
+            for i in range(0, len(X_test)):
+                outer = X_test[i, :, :]
+                for j in range(0, outer.shape[1]):
+                    fft = (np.fft.fft(outer[:, [j]]))
+                    outer[:,[j]] = fft
+                X_train[i] = outer
+            self.X_test = X_test
+            print("finished FFT test", X_test.shape )
         
         
     def z_norm(self, result):
@@ -395,14 +433,24 @@ def normalize(v):
 
 
 trainer = Trainer()
-trainer.prepareOnPrerecorded('..\\data\\train_parcour.csv')
-model = build_model()
-model, min, max = trainer.trainGroundLevel(model)
-model.save('trained-train_parcour.h5', overwrite=True)
-with open("thresholds.txt", 'w') as file:
-    file.write(str(min) + "#" + str(max))
 
-#predictor = Predictor(model, min, max)
 
-#detector = UDP_Detector(8888, 500, 50, predictor)
-#detector.start()
+## train + save
+#model = build_model()
+#trainer.prepareOnPrerecorded('..\\data\\train_parcour.csv')
+#model, min, max = trainer.trainGroundLevel(model)
+#model.save('trained-train_parcour.h5', overwrite=True)
+#with open("thresholds.txt", 'w') as file:
+#    file.write(str(min) + "#" + str(max))
+
+
+##load + predict
+model = load_model('trained-train_parcour.h5')
+f = open('thresholds_parcour.txt', 'r')
+input = f.read().split('#')
+min = float(input[0])
+max = float(input[1])
+
+predictor = Predictor(model, min, max)
+detector = UDP_Detector(8888, 500, 50, predictor)
+detector.start()
