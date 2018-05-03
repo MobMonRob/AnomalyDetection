@@ -40,18 +40,22 @@ sequence_length = 100
 random_data_dup = 10  # each sample randomly duplicated between 0 and 9 times, see dropin function
 epochs = 1
 batch_size = 50
-FFT = False
+FFT = True
+output_name = ''
+
 
 class Predictor:
     X_test = []
     y_test = []
-    anomaly = False
-    anomalyCounter = 0
+#    anomaly = False
+#    anomalyCounter = 0
     
     def __init__(self, model, min, max):
         self.model = model
         self.min = min
         self.max = max
+        self.error = 0
+        self.anomaly = False
         
     def z_norm(self, result):
         global stddev ## evtl fixen
@@ -63,8 +67,16 @@ class Predictor:
         result /= result_std
         return result
     
+    def reset(self):
+        self.error = 0
+        self.anomaly = False
+        
+    def printError(self):
+        print("Gesamtfehler für " + output_name + ": " + str(self.error) )
+        
     def predictForFrame(self, data):
         result = []
+        #print(data.shape)
         for index in range(0, len(data) - sequence_length):
             result.append(data[index: index + sequence_length])
         result = np.array(result) 
@@ -72,6 +84,7 @@ class Predictor:
 
         X_test = result[:, :-1]
         y_test = result[:, -1]
+        
         self.X_test = np.reshape(X_test, (X_test.shape[0], X_test.shape[1], 6))
         
         if (FFT):
@@ -99,11 +112,11 @@ class Predictor:
             
         signal =[]
         for i in range (0, len(predicted)):
-            signal.append(abs(y_test [i][0])+abs(y_test [i][1])+abs(y_test [i][2])+abs(y_test [i][3])+abs(y_test [i][4])+abs(y_test [i][5]))
+            signal.append(abs(y_test [i][0][0])+abs(y_test [i][0][1])+abs(y_test [i][0][2])+abs(y_test [i][0][3])+abs(y_test [i][0][4])+abs(y_test [i][0][5]))
 
  
         mse = ((signal - z) ** 2)        
-        
+        print(self.anomaly)
          # generate threshold
         max = 0
         min = 0
@@ -117,11 +130,16 @@ class Predictor:
         if (max > self.max or min < self.min):
             if not self.anomaly:
                 self.anomaly = True
-                self.anomalyCounter = self.anomalyCounter + 1
+                self.error = self.error + 1
         else:
             if self.anomaly:
                 self.anomaly = False
-        print(self.anomalyCounter, 'Error = ', max)
+        
+        print(str(self.error) + 'Error =', max, ' Threshold =', self.max)
+        
+        with open("error_" + output_name +  ".txt", 'a') as file:
+           file.write(str(max) + '\n')
+
 
 class Trainer:
     trainData = []
@@ -319,6 +337,63 @@ class UDP_Detector:
     def predict(self):
         self.predictor.predictForFrame(self.predict_array)
     
+    def startWithPrerecordedData(self, offlinePath):
+        f = open(offlinePath, 'r')
+        lines = f.readlines()
+        print('number of data points in file ', len(lines))
+        first_fill = True
+        self.predict_array = []
+        i = 0
+        # init Q according to frame size
+        frameQ = queue.Queue(maxsize=self.frame_size)
+        
+        
+        for line in lines:
+            split = line.split(',')
+            measurement = []
+            if (len(split) > 9):
+                measurement.append([float(split[2]), float(split[3]), float(split[4]), float(split[6]), float(split[7]), float(split[8])])    
+                
+                # fill Q initially
+                if (first_fill):
+                    
+                    # fill Q
+                    frameQ.put_nowait(measurement)
+                    
+                    if (frameQ.full()):
+                        
+                        #print ("Q initially filled")
+                        
+                        # dump Q to numpy array
+                        self.predict_array = np.array(frameQ.queue)
+                        
+                        # call the predictor
+                        self.predict()
+                        #print ("started prediction with initial Q")
+                        
+                        # next measurement will pop the first element of the Q
+                        first_fill = False
+                else:
+                    i = i + 1
+                    
+                    # pop first element of the Q
+                    frameQ.get()
+                    
+                    frameQ.put_nowait(measurement)
+            
+                if (i == self.disp_size): # Q updated according to disp_size
+                    
+                    #print ("Q updated according to disp_size = " + str(self.disp_size))
+                    
+                    #dump Q to numpy
+                    self.predict_array = np.array(frameQ.queue)
+                    
+                    # call the predictor
+                    self.predict()
+                    #print ("started prediction with " + str(self.disp_size) + " new elements in frame")
+                    
+                    i = 0
+    
     def start(self):
         
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -436,22 +511,31 @@ trainer = Trainer()
 
 
 ## train + save
-trainer.prepareOnPrerecorded('..\\data\\first_final_small_training.csv')
-model = build_model()
-model, min, max = trainer.trainGroundLevel(model)
-model.save('trained-first_final_small_training.h5', overwrite=True)
-with open("thresholds_first_final_small_training.txt", 'w') as file:
-    file.write(str(min) + "#" + str(max))
+#trainer.prepareOnPrerecorded('..\\data\\first_final_small_training.csv')
+#model = build_model()
+#model, min, max = trainer.trainGroundLevel(model)
+#model.save('trained-first_final_small_training.h5', overwrite=True)
+#with open("thresholds_first_final_small_training.txt", 'w') as file:
+#    file.write(str(min) + "#" + str(max))
 
 
-##load + predict
-#model = load_model('trained-train_parcour.h5')
-#f = open('thresholds_parcour.txt', 'r')
-#input = f.read().split('#')
-#min = float(input[0])
-#max = float(input[1])
+#load + predict
+model = load_model('trained-train_parcour_fft.h5')
+f = open('thresholds_train_parcour_fft.txt', 'r')
+input = f.read().split('#')
+min = float(input[0])
+max = float(input[1])
 
 predictor = Predictor(model, min, max)
 detector = UDP_Detector(8888, 500, 50, predictor)
 #detector.start()
-#detector.startWithPrerecordedData('..\\data\\train_parcour.csv')
+
+
+
+for i in range (1,7):
+    name = "halb_" + str(i)
+    output_name = name
+    predictor.reset()
+    detector.startWithPrerecordedData('..\\Sensor Data Final\\' + name + '.csv')
+    predictor.printError()
+print(error)

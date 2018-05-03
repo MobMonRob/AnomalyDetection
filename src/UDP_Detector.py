@@ -23,10 +23,10 @@ class UDP_Detector:
         self.port = port
         self.disp_size = disp_size
         self.predictor = predictor
-       
+        
     def predict(self):
         self.predictor.predictForFrame(self.predict_array)
-    
+        
     def startWithPrerecordedData(self, offlinePath):
         f = open(offlinePath, 'r')
         lines = f.readlines()
@@ -159,4 +159,4 @@ class UDP_Detector:
             self.run = False
             
 detector = UDP_Detector(8888, 100, 10, True)
-detector.start()
+#detector.startWithPrerecordedData('')
