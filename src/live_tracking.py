@@ -436,21 +436,22 @@ trainer = Trainer()
 
 
 ## train + save
-#model = build_model()
-#trainer.prepareOnPrerecorded('..\\data\\train_parcour.csv')
-#model, min, max = trainer.trainGroundLevel(model)
-#model.save('trained-train_parcour.h5', overwrite=True)
-#with open("thresholds.txt", 'w') as file:
-#    file.write(str(min) + "#" + str(max))
+trainer.prepareOnPrerecorded('..\\data\\first_final_small_training.csv')
+model = build_model()
+model, min, max = trainer.trainGroundLevel(model)
+model.save('trained-first_final_small_training.h5', overwrite=True)
+with open("thresholds_first_final_small_training.txt", 'w') as file:
+    file.write(str(min) + "#" + str(max))
 
 
 ##load + predict
-model = load_model('trained-train_parcour.h5')
-f = open('thresholds_parcour.txt', 'r')
-input = f.read().split('#')
-min = float(input[0])
-max = float(input[1])
+#model = load_model('trained-train_parcour.h5')
+#f = open('thresholds_parcour.txt', 'r')
+#input = f.read().split('#')
+#min = float(input[0])
+#max = float(input[1])
 
 predictor = Predictor(model, min, max)
 detector = UDP_Detector(8888, 500, 50, predictor)
-detector.start()
+#detector.start()
+#detector.startWithPrerecordedData('..\\data\\train_parcour.csv')
