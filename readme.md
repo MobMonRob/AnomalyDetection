@@ -16,3 +16,6 @@ pip install
 ```
 python 1dim_anomalydetection.py
 ```
+Gefördert durch das Ministerium für Wirtschaft und Energie aufgrund eines Beschlusses des Deutschen Bundestages.
+
+![](/images/zimlogo.png) ![](/images/logo-bmwi_small.png) 
